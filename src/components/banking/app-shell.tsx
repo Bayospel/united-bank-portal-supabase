@@ -83,8 +83,8 @@ export function AppShell({
     <div className="min-h-screen w-full bg-background">
       {/* Executive sidebar (desktop) */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-navy text-primary-foreground lg:flex">
-        <div className="flex items-center bg-white px-5 py-5">
-          <Logo className="h-12 w-full object-contain" />
+        <div className="flex items-center justify-center bg-white px-5 py-2">
+          <Logo className="h-16 w-auto object-contain" />
         </div>
         <nav className="flex-1 space-y-1 px-3 py-6">
           {navItems.map((item) => (
@@ -139,8 +139,8 @@ export function AppShell({
               </SheetTrigger>
               <SheetContent side="left" className="w-72 bg-navy text-white [&>button]:text-white">
                 <SheetTitle className="sr-only">Menu</SheetTitle>
-                <div className="bg-white/95 p-3">
-                  <Logo className="h-10 w-full object-contain" />
+                <div className="flex justify-center bg-white/95 p-3">
+                  <Logo className="h-14 w-auto object-contain" />
                 </div>
                 <nav className="mt-4 space-y-1 px-2">
                   {navItems.map((item) => (
@@ -168,7 +168,7 @@ export function AppShell({
               </SheetContent>
             </Sheet>
             <Link to="/dashboard" className="min-w-0">
-              <Logo className="h-9 w-auto max-w-[180px] object-contain" />
+              <Logo className="h-14 w-auto max-w-[84px] object-contain" />
             </Link>
           </div>
 

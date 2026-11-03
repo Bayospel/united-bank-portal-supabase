@@ -13,12 +13,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle2, Loader2, Lock, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (search: Record<string, unknown>): { mode?: "signup" } =>
+    search.mode === "signup" ? { mode: "signup" } : {},
   head: () => ({
     meta: [
       { title: "Client Login | United Bank Offshore" },
       {
         name: "description",
-        content: "Sign in to your United Bank Offshore multi-currency banking console.",
+        content:
+          "Sign in to the United Bank Offshore portal preview. No live banking or real funds are provided.",
       },
       { property: "og:title", content: "Client Login | United Bank Offshore" },
       { property: "og:type", content: "website" },
@@ -33,7 +36,8 @@ type Mode = "signin" | "signup" | "forgot";
 function AuthPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [mode, setMode] = useState<Mode>("signin");
+  const search = Route.useSearch();
+  const [mode, setMode] = useState<Mode>(search.mode ?? "signin");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -93,7 +97,6 @@ function AuthPage() {
     if (result.error) toast.error(result.error.message);
   }
 
-
   const busy = passwordSignIn.isPending || signUp.isPending || sendReset.isPending;
 
   return (
@@ -109,39 +112,37 @@ function AuthPage() {
         />
         <div className="relative">
           <div className="inline-block rounded-xl bg-white px-4 py-2.5">
-            <Logo className="h-11 w-auto" />
+            <Logo className="h-20 w-auto" />
           </div>
         </div>
         <div className="relative max-w-md">
           <h1 className="font-display text-3xl font-bold leading-snug">
-            Your offshore treasury,
+            A considered view of global accounts,
             <br />
-            <span className="text-gold">one encrypted console.</span>
+            <span className="text-gold">wherever business takes you.</span>
           </h1>
           <ul className="mt-8 space-y-4 text-sm text-white/75">
             <li className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
-              Two-factor authentication and trusted device management
+              Manage sign-in settings and trusted devices
             </li>
             <li className="flex items-start gap-3">
               <Lock className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
-              Encrypted sessions with a full login audit trail
+              Review account and security activity
             </li>
             <li className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
-              USD, EUR, GBP and ZAR wallets with dedicated account details
+              Explore USD, EUR, GBP and ZAR account views
             </li>
           </ul>
         </div>
-        <p className="relative text-xs text-white/50">
-          Global banking. Borderless opportunities.
-        </p>
+        <p className="relative text-xs text-white/50">Global banking. Borderless opportunities.</p>
       </div>
 
       {/* Form panel */}
       <div className="flex flex-col items-center justify-center px-4 py-10 sm:px-8">
         <div className="mb-8 rounded-xl bg-white lg:hidden">
-          <Logo className="h-16 w-auto" />
+          <Logo className="h-20 w-auto" />
         </div>
 
         <div className="w-full max-w-md">
@@ -160,14 +161,18 @@ function AuthPage() {
           ) : (
             <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
               <h2 className="font-display text-2xl font-bold text-navy">
-                {mode === "signup" ? "Open your account" : mode === "forgot" ? "Reset password" : "Client login"}
+                {mode === "signup"
+                  ? "Open your account"
+                  : mode === "forgot"
+                    ? "Reset password"
+                    : "Client login"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {mode === "signup"
-                  ? "Multi-currency accounts are provisioned instantly."
+                  ? "Create a portal profile to preview account setup."
                   : mode === "forgot"
                     ? "We'll email you a secure reset link."
-                    : "Secure access to your accounts."}
+                    : "Sign in to the client-portal preview."}
               </p>
 
               <form
@@ -227,7 +232,11 @@ function AuthPage() {
                     />
                   </div>
                 )}
-                <Button type="submit" disabled={busy} className="w-full bg-navy text-white hover:bg-navy/90">
+                <Button
+                  type="submit"
+                  disabled={busy}
+                  className="w-full bg-navy text-white hover:bg-navy/90"
+                >
                   {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {mode === "signin"
                     ? "Sign in"
@@ -269,7 +278,7 @@ function AuthPage() {
                   </div>
 
                   <p className="mt-6 text-center text-sm text-muted-foreground">
-                    {mode === "signin" ? "New to United Bank Offshore?" : "Already a client?"}{" "}
+                    {mode === "signin" ? "New to the portal?" : "Already set up?"}{" "}
                     <button
                       type="button"
                       onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
@@ -284,8 +293,11 @@ function AuthPage() {
           )}
 
           <p className="mt-4 text-center text-xs text-muted-foreground">
+            Portal preview only. No live banking or real funds are provided.
+          </p>
+          <p className="mt-3 text-center text-xs text-muted-foreground">
             <Link to="/" className="underline-offset-2 hover:underline">
-              ← Back to unitedbank.com
+              ← Back to portal preview
             </Link>
           </p>
         </div>

@@ -81,9 +81,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "United Bank Offshore" },
-      { name: "description", content: "Private & corporate offshore banking, borderless." },
+      {
+        name: "description",
+        content:
+          "United Bank Offshore portal preview for multi-currency accounts. No live banking or real funds are provided.",
+      },
       { property: "og:title", content: "United Bank Offshore" },
-      { property: "og:description", content: "Global banking. Borderless opportunities." },
+      {
+        property: "og:description",
+        content:
+          "An illustrative multi-currency client portal. No live banking or real funds are provided.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],

@@ -34,7 +34,7 @@ Create a fully responsive, mobile-first professional online banking web applicat
 - **Wire Transfer Modal / Flow:** Step-by-step transfer wizard supporting Domestic Wire, SWIFT International, SEPA, and internal currency exchange with real-time conversion rates and fee estimation.
 - **Transaction History:** Filterable table/feed with download statement (CSV/PDF) and transaction details.
 - **Security & Compliance Tab:** 2FA settings, biometric toggle, transaction limits, and device management.
-- Complete with mock authenticated demo mode and Supabase authentication integration.
+- Includes an illustrative portal preview and Supabase authentication integration; no live banking or real funds are provided.
 
 This project was built with [Lovable](https://lovable.dev).
 
