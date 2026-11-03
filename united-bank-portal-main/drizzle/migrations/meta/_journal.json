@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793105876755,
+      "tag": "0000_banking_core_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793105886883,
+      "tag": "0001_fix_execute_transfer",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793106022687,
+      "tag": "0002_profile_limits_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793158215951,
+      "tag": "0003_zar_payshap_currency",
+      "breakpoints": true
+    }
+  ]
+}
