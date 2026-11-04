@@ -1,19 +1,14 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, FileCheck2, Landmark, Loader2, ShieldCheck, UserRound } from "lucide-react";
+import { CreditCard, FileCheck2, Landmark, Loader2, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  adminCreditAccountFn,
-  getAdminCustomersFn,
-  type AdminCustomer,
-  type AdminCustomerAccount,
-} from "@/lib/banking.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { formatDateTime, formatMoney } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -23,15 +18,32 @@ export const Route = createFileRoute("/_authenticated/admin")({
       { name: "description", content: "United Bank Offshore administrator console." },
     ],
   }),
-  loader: () => getAdminCustomersFn(),
   component: AdminPage,
 });
 
+export interface AdminCustomerAccount {
+  id: string;
+  currency: string;
+  balance: number;
+  account_number: string | null;
+  iban: string | null;
+  status: string;
+}
+
+export interface AdminCustomer {
+  id: string;
+  display_name: string | null;
+  email: string | null;
+  residential_address: string | null;
+  employment_details: string | null;
+  date_of_birth: string | null;
+  government_id_status: string;
+  government_id_path: string | null;
+  created_at: string;
+  accounts: AdminCustomerAccount[];
+}
+
 function AdminPage() {
-  const customers = useSuspenseQuery({
-    queryKey: ["admin-customers"],
-    queryFn: () => getAdminCustomersFn(),
-  }).data;
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<{
     customer: AdminCustomer;
@@ -40,22 +52,54 @@ function AdminPage() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
+  // Client-side fetcher with error reporting
+  const { data: customers = [], isLoading, error, refetch } = useQuery({
+    queryKey: ["admin-customers-client"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_list_customers");
+      if (error) {
+        console.error("RPC Error:", error);
+        throw new Error(error.message);
+      }
+      return (data ?? []) as AdminCustomer[];
+    },
+  });
+
   const credit = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!selected) throw new Error("Select a customer account first");
-      return adminCreditAccountFn({
-        data: { accountId: selected.account.id, amount: Number(amount), note },
+      const { data, error } = await supabase.rpc("admin_credit_account", {
+        _account_id: selected.account.id,
+        _amount: Number(amount),
+        _note: note,
       });
+      if (error) throw new Error(error.message);
+      return data;
     },
     onSuccess: () => {
-      toast.success("Customer balance credited");
+      toast.success("Customer balance credited successfully");
       setAmount("");
       setNote("");
       setSelected(null);
-      queryClient.invalidateQueries({ queryKey: ["admin-customers"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-customers-client"] });
     },
-    onError: (error) => toast.error(error.message),
+    onError: (err: Error) => toast.error(err.message),
   });
+
+  if (error) {
+    return (
+      <div className="mx-auto max-w-xl rounded-2xl border bg-card p-8 text-center shadow-sm">
+        <ShieldCheck className="mx-auto h-12 w-12 text-destructive" />
+        <h2 className="mt-4 font-display text-xl font-bold text-navy">Unable to load Admin Console</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        <div className="mt-6 flex justify-center gap-3">
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -85,12 +129,17 @@ function AdminPage() {
             <div>
               <h2 className="font-display text-xl font-semibold text-navy">Customer accounts</h2>
               <p className="text-sm text-muted-foreground">
-                {customers.length} customer{customers.length === 1 ? "" : "s"} registered
+                {isLoading ? "Loading customers..." : `${customers.length} customer(s) registered`}
               </p>
             </div>
             <UserRound className="h-5 w-5 text-gold" />
           </div>
-          {customers.length === 0 ? (
+
+          {isLoading ? (
+            <div className="flex items-center justify-center rounded-2xl border bg-card p-12 text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading customer records...
+            </div>
+          ) : customers.length === 0 ? (
             <div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">
               No customer accounts found.
             </div>
@@ -113,7 +162,7 @@ function AdminPage() {
                 <h2 className="font-display text-lg font-semibold text-navy">Add customer funds</h2>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                {selected.customer.display_name} · {selected.account.currency} account
+                {selected.customer.display_name ?? "Customer"} · {selected.account.currency} account
               </p>
               <div className="mt-5 space-y-4">
                 <div className="space-y-1.5">
@@ -147,8 +196,7 @@ function AdminPage() {
                     disabled={credit.isPending || Number(amount) <= 0 || note.trim().length < 3}
                     onClick={() => credit.mutate()}
                   >
-                    {credit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Credit
-                    balance
+                    {credit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Credit balance
                   </Button>
                 </div>
               </div>
@@ -189,27 +237,18 @@ function CustomerCard({
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold-soft px-2.5 py-1 text-xs font-semibold text-navy">
-          <FileCheck2 className="h-3.5 w-3.5" /> {customer.government_id_status.replace("_", " ")}
+          <FileCheck2 className="h-3.5 w-3.5" /> {(customer.government_id_status ?? "pending").replace("_", " ")}
         </span>
       </div>
-      <dl className="mt-4 grid gap-3 border-t pt-4 text-sm sm:grid-cols-2">
-        <Info label="Date of birth" value={customer.date_of_birth ?? "Not supplied"} />
-        <Info label="Employment" value={customer.employment_details ?? "Not supplied"} />
-        <Info label="Residential address" value={customer.residential_address ?? "Not supplied"} />
-        <Info
-          label="Government ID"
-          value={customer.government_id_path ? "Document submitted" : "Verification requested"}
-        />
-      </dl>
       <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {customer.accounts.map((account) => (
+        {(customer.accounts ?? []).map((account) => (
           <div key={account.id} className="rounded-xl border bg-surface p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold text-navy">{account.currency}</p>
               <span className="text-[10px] text-muted-foreground">{account.status}</span>
             </div>
             <p className="mt-1 tabular text-lg font-bold text-navy">
-              {formatMoney(Number(account.balance), account.currency)}
+              {formatMoney(Number(account.balance), account.currency as any)}
             </p>
             <p className="mt-1 truncate text-[10px] text-muted-foreground">
               {account.account_number ?? account.iban ?? "No account identifier"}
@@ -225,16 +264,5 @@ function CustomerCard({
         ))}
       </div>
     </article>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 break-words text-sm text-foreground">{value}</dd>
-    </div>
   );
 }
