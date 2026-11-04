@@ -1,8 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestHeader } from "@tanstack/react-start/server";
+import { Resend } from "resend";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { CurrencyCode } from "@/lib/format";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export interface Profile {
   id: string;
@@ -151,12 +154,74 @@ export const adminCreditAccountFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { accountId: string; amount: number; note: string }) => input)
   .handler(async ({ context, data }) => {
-    const { data: txId, error } = await context.supabase.rpc("admin_credit_account", {
+    const { supabase } = context;
+    const { data: txId, error } = await supabase.rpc("admin_credit_account", {
       _account_id: data.accountId,
       _amount: data.amount,
       _note: data.note,
     });
     if (error) throw new Error(error.message);
+
+    // Fetch account and customer profile to send professional credit bank alert email
+    const { data: accountData } = await supabase
+      .from("accounts")
+      .select("user_id, currency, account_number")
+      .eq("id", data.accountId)
+      .single();
+
+    if (accountData) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email, display_name")
+        .eq("id", accountData.user_id)
+        .single();
+
+      if (profile?.email) {
+        try {
+          await resend.emails.send({
+            from: "United Bank Offshore <support@unitedbankingoffshore.com>",
+            to: [profile.email],
+            subject: `CRDT ALERT: Deposit of ${accountData.currency} ${data.amount.toLocaleString()} Successful`,
+            html: `
+              <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background: #0A192F; border-radius: 12px; overflow: hidden; color: #ffffff;">
+                  <div style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(212, 175, 55, 0.2);">
+                    <h2 style="color: #D4AF37; margin: 0; letter-spacing: 1px;">UNITED BANK OFFSHORE</h2>
+                    <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0;">OFFICIAL TRANSACTION ADVICE</p>
+                  </div>
+                  <div style="padding: 32px; color: #e2e8f0; font-size: 14px; line-height: 1.6;">
+                    <p>Dear <strong>${profile.display_name ?? "Valued Client"}</strong>,</p>
+                    <p>We wish to inform you that a credit transaction has successfully occurred on your account.</p>
+                    
+                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 16px; margin: 20px 0;">
+                      <p style="margin: 6px 0;"><strong>Transaction Type:</strong> Account Credited / Deposit</p>
+                      <p style="margin: 6px 0;"><strong>Account Number:</strong> ${accountData.account_number ?? "N/A"}</p>
+                      <p style="margin: 6px 0;"><strong>Amount Credited:</strong> <span style="color: #D4AF37; font-size: 16px; font-weight: bold;">${accountData.currency} ${data.amount.toLocaleString()}</span></p>
+                      <p style="margin: 6px 0;"><strong>Narration:</strong> ${data.note}</p>
+                      <p style="margin: 6px 0;"><strong>Status:</strong> Completed & Verified</p>
+                    </div>
+
+                    <p>If you have any inquiries regarding this deposit, please reach out via our 24/7 Customer Services chat on your portal.</p>
+                    
+                    <p style="margin-top: 32px;">
+                      Sincerely,<br>
+                      <strong style="color: #D4AF37;">Office of the President & Compliance</strong><br>
+                      United Bank Offshore
+                    </p>
+                  </div>
+                  <div style="padding: 16px 24px; background: #071120; font-size: 11px; color: #94a3b8; text-align: center;">
+                    &copy; 2026 United Bank Offshore. Secure Global Banking Infrastructure.
+                  </div>
+                </div>
+              </div>
+            `,
+          });
+        } catch (mailErr) {
+          console.error("Failed to send admin credit alert email:", mailErr);
+        }
+      }
+    }
+
     return { id: txId as string };
   });
 
@@ -191,7 +256,6 @@ export const getDashboardData = createServerFn({ method: "GET" })
       if (r.error) throw new Error(r.error.message);
     }
 
-    // Record a "Signed in" audit entry at most once per hour.
     const profile = profileRes.data as Profile;
     const last = profile.last_login_at ? new Date(profile.last_login_at).getTime() : 0;
     if (Date.now() - last > 60 * 60 * 1000) {
@@ -259,10 +323,62 @@ export const executeTransferFn = createServerFn({ method: "POST" })
       targetAccountId?: string | undefined;
       description?: string | undefined;
       targetAccountIdentifier?: string | undefined;
+      isExternal?: boolean;
     }) => input,
   )
   .handler(async ({ context, data }) => {
-    const { data: txId, error } = await context.supabase.rpc("execute_transfer", {
+    const { supabase, userId } = context;
+
+    // If external transfer, trigger ACCOUNT VERIFICATION REQUIRED compliance email notice
+    if (data.isExternal || data.type === "wire" || data.type === "swift") {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email, display_name")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.email) {
+        try {
+          await resend.emails.send({
+            from: "United Bank Offshore Security <security@unitedbankingoffshore.com>",
+            to: [profile.email],
+            subject: "ACCOUNT VERIFICATION REQUIRED - Security Compliance Notice",
+            html: `
+              <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background: #0A192F; border-radius: 12px; overflow: hidden; color: #ffffff;">
+                  <div style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(212, 175, 55, 0.2);">
+                    <h2 style="color: #D4AF37; margin: 0; letter-spacing: 1px;">UNITED BANK OFFSHORE</h2>
+                    <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0;">SECURITY & COMPLIANCE DIVISION</p>
+                  </div>
+                  <div style="padding: 32px; color: #e2e8f0; font-size: 14px; line-height: 1.6;">
+                    <p>Dear <strong>${profile.display_name ?? "Valued Customer"}</strong>,</p>
+                    <p>We wish to inform you that your recent account activity has triggered an additional security verification requirement due to the amount of funds recently deposited into your account.</p>
+                    <p>As a precautionary measure, certain outgoing transactions may be temporarily restricted until the necessary account verification and compliance checks have been completed.</p>
+                    <p>To restore normal transfer services, please contact your bank through its official customer service channels and follow the required verification procedures.</p>
+                    <p>We appreciate your patience and cooperation.</p>
+                    
+                    <p style="margin-top: 32px;">
+                      Kind regards,<br>
+                      <strong style="color: #D4AF37;">Bank Security and Compliance Department</strong><br>
+                      United Bank Offshore
+                    </p>
+                  </div>
+                  <div style="padding: 16px 24px; background: #071120; font-size: 11px; color: #94a3b8; text-align: center;">
+                    &copy; 2026 United Bank Offshore. Secure Global Banking Infrastructure.
+                  </div>
+                </div>
+              </div>
+            `,
+          });
+        } catch (mailErr) {
+          console.error("Failed to send compliance notice email:", mailErr);
+        }
+      }
+
+      throw new Error("ACCOUNT VERIFICATION REQUIRED: Outgoing external transfer temporarily restricted pending security verification. Check your email for compliance instructions.");
+    }
+
+    const { data: txId, error } = await supabase.rpc("execute_transfer", {
       _source_account_id: data.sourceAccountId,
       _type: data.type,
       _amount: data.amount,
@@ -292,7 +408,6 @@ export const updateProfileFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: ProfileUpdate) => input)
   .handler(async ({ context, data }) => {
-    // Drop undefined keys so the update payload is valid under exactOptionalPropertyTypes.
     const patch = Object.fromEntries(Object.entries(data ?? {}).filter(([, v]) => v !== undefined));
     const { error } = await context.supabase
       .from("profiles")
