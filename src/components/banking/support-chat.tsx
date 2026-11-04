@@ -102,17 +102,44 @@ export function SupportChat() {
 
   async function submitAgent() {
     setError(null);
+
+    // Form input validation to prevent invalid/empty payloads
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedMessage = message.trim();
+
+    if (!trimmedName) {
+      setError("Please enter your name.");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!trimmedMessage) {
+      setError("Please enter your message.");
+      return;
+    }
+
     setSending(true);
     try {
       const res = await sendSupportMessageFn({
-        data: { name, email, message, website },
+        data: {
+          name: trimmedName,
+          email: trimmedEmail,
+          message: trimmedMessage,
+          website,
+        },
       });
       setMessages((m) => [
         ...m,
-        { from: "user", text: message },
+        { from: "user", text: trimmedMessage },
         {
           from: "bot",
-          text: `Thank you. Your message has been sent to Customer Services (reference ${res.reference}). We will reply to ${email} as soon as possible.`,
+          text: `Thank you. Your message has been sent to Customer Services (reference ${res.reference}). We will reply to ${trimmedEmail} as soon as possible.`,
         },
       ]);
       setMessage("");
