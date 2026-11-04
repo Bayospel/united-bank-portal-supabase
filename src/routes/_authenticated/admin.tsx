@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, FileCheck2, Landmark, Loader2, MessageSquare, RefreshCw, Send, ShieldCheck, UserRound } from "lucide-react";
+import { CreditCard, FileCheck2, Landmark, Loader2, MessageSquare, MinusCircle, PlusCircle, RefreshCw, Send, ShieldCheck, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,7 @@ function AdminPage() {
   const [selected, setSelected] = useState<{
     customer: AdminCustomer;
     account: AdminCustomerAccount;
+    mode: "credit" | "debit";
   } | null>(null);
   
   const [activeChatCustomer, setActiveChatCustomer] = useState<AdminCustomer | null>(null);
@@ -72,7 +73,6 @@ function AdminPage() {
     },
   });
 
-  // Fetch chat messages for active chat customer
   const { data: chatMessages = [], refetch: refetchChat } = useQuery({
     queryKey: ["admin-chat", activeChatCustomer?.id],
     enabled: !!activeChatCustomer,
@@ -87,7 +87,6 @@ function AdminPage() {
     },
   });
 
-  // Realtime listener for live chat updates
   useEffect(() => {
     if (!activeChatCustomer) return;
     const channel = supabase
@@ -123,10 +122,11 @@ function AdminPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const credit = useMutation({
+  const adjustBalance = useMutation({
     mutationFn: async () => {
-      if (!selected) throw new Error("Select a customer account first");
-      const { data, error } = await supabase.rpc("admin_credit_account", {
+      if (!selected) throw new Error("Select an account first");
+      const rpcName = selected.mode === "credit" ? "admin_credit_account" : "admin_debit_account";
+      const { data, error } = await supabase.rpc(rpcName, {
         _account_id: selected.account.id,
         _amount: Number(amount),
         _note: note,
@@ -135,7 +135,11 @@ function AdminPage() {
       return data;
     },
     onSuccess: () => {
-      toast.success("Customer balance credited successfully");
+      toast.success(
+        selected?.mode === "credit"
+          ? "Customer balance credited successfully"
+          : "Customer balance debited successfully"
+      );
       setAmount("");
       setNote("");
       setSelected(null);
@@ -171,7 +175,7 @@ function AdminPage() {
               United Bank Admin Console
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-white/65">
-              Review customer accounts, verification details, credit balances, and chat live with customers.
+              Review customer accounts, verification details, add or deduct balances, and chat live with customers.
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-gold/30 bg-white/5 px-3 py-2 text-xs font-semibold text-gold">
@@ -205,7 +209,7 @@ function AdminPage() {
               <CustomerCard
                 key={customer.id}
                 customer={customer}
-                onCredit={(account) => setSelected({ customer, account })}
+                onSelect={(account, mode) => setSelected({ customer, account, mode })}
                 onOpenChat={() => setActiveChatCustomer(customer)}
               />
             ))
@@ -213,21 +217,23 @@ function AdminPage() {
         </section>
 
         <aside className="h-fit space-y-6 lg:sticky lg:top-24">
-          {/* Credit Account Panel */}
+          {/* Balance Adjustment Panel */}
           {selected && (
             <div className="rounded-2xl border bg-card p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-gold" />
-                <h2 className="font-display text-lg font-semibold text-navy">Add customer funds</h2>
+                <h2 className="font-display text-lg font-semibold text-navy">
+                  {selected.mode === "credit" ? "Credit Customer Balance" : "Debit Customer Balance"}
+                </h2>
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
                 {selected.customer.display_name ?? "Customer"} · {selected.account.currency} account
               </p>
               <div className="mt-5 space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="creditAmount">Amount ({selected.account.currency})</Label>
+                  <Label htmlFor="adjAmount">Amount ({selected.account.currency})</Label>
                   <Input
-                    id="creditAmount"
+                    id="adjAmount"
                     type="number"
                     min="0.01"
                     step="0.01"
@@ -237,11 +243,15 @@ function AdminPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="creditNote">Reason / audit note</Label>
+                  <Label htmlFor="adjNote">Reason / Audit Note</Label>
                   <Textarea
-                    id="creditNote"
+                    id="adjNote"
                     rows={3}
-                    placeholder="Approved opening balance adjustment"
+                    placeholder={
+                      selected.mode === "credit"
+                        ? "Approved opening balance adjustment"
+                        : "Administrative debit adjustment"
+                    }
                     value={note}
                     onChange={(event) => setNote(event.target.value)}
                   />
@@ -251,11 +261,16 @@ function AdminPage() {
                     Cancel
                   </Button>
                   <Button
-                    className="flex-1 bg-gold font-semibold text-navy hover:bg-gold/90"
-                    disabled={credit.isPending || Number(amount) <= 0 || note.trim().length < 3}
-                    onClick={() => credit.mutate()}
+                    className={`flex-1 font-semibold text-white ${
+                      selected.mode === "credit"
+                        ? "bg-gold text-navy hover:bg-gold/90"
+                        : "bg-destructive hover:bg-destructive/90"
+                    }`}
+                    disabled={adjustBalance.isPending || Number(amount) <= 0 || note.trim().length < 3}
+                    onClick={() => adjustBalance.mutate()}
                   >
-                    {credit.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Credit balance
+                    {adjustBalance.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {selected.mode === "credit" ? "Credit Balance (+)" : "Debit Balance (-)"}
                   </Button>
                 </div>
               </div>
@@ -332,11 +347,11 @@ function AdminPage() {
 
 function CustomerCard({
   customer,
-  onCredit,
+  onSelect,
   onOpenChat,
 }: {
   customer: AdminCustomer;
-  onCredit: (account: AdminCustomerAccount) => void;
+  onSelect: (account: AdminCustomerAccount, mode: "credit" | "debit") => void;
   onOpenChat: () => void;
 }) {
   return (
@@ -383,13 +398,23 @@ function CustomerCard({
             <p className="mt-1 truncate text-[10px] text-muted-foreground">
               {account.account_number ?? account.iban ?? "No account identifier"}
             </p>
-            <Button
-              size="sm"
-              className="mt-3 w-full bg-navy text-white hover:bg-navy/90"
-              onClick={() => onCredit(account)}
-            >
-              Add money
-            </Button>
+            <div className="mt-3 flex gap-1.5">
+              <Button
+                size="sm"
+                className="flex-1 bg-navy text-white hover:bg-navy/90 text-xs px-2"
+                onClick={() => onSelect(account, "credit")}
+              >
+                <PlusCircle className="mr-1 h-3.5 w-3.5" /> Credit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 text-destructive border-destructive/30 hover:bg-destructive/10 text-xs px-2"
+                onClick={() => onSelect(account, "debit")}
+              >
+                <MinusCircle className="mr-1 h-3.5 w-3.5" /> Debit
+              </Button>
+            </div>
           </div>
         ))}
       </div>
