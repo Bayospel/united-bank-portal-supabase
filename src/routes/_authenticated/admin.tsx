@@ -52,7 +52,6 @@ function AdminPage() {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
-  // Client-side fetcher with error reporting
   const { data: customers = [], isLoading, error, refetch } = useQuery({
     queryKey: ["admin-customers-client"],
     queryFn: async () => {
@@ -240,6 +239,17 @@ function CustomerCard({
           <FileCheck2 className="h-3.5 w-3.5" /> {(customer.government_id_status ?? "pending").replace("_", " ")}
         </span>
       </div>
+
+      <dl className="mt-4 grid gap-3 border-t pt-4 text-sm sm:grid-cols-2">
+        <Info label="Date of birth" value={customer.date_of_birth ?? "Not supplied"} />
+        <Info label="Employment" value={customer.employment_details ?? "Not supplied"} />
+        <Info label="Residential address" value={customer.residential_address ?? "Not supplied"} />
+        <Info
+          label="Government ID"
+          value={customer.government_id_path ? "Document submitted" : "Verification requested"}
+        />
+      </dl>
+
       <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
         {(customer.accounts ?? []).map((account) => (
           <div key={account.id} className="rounded-xl border bg-surface p-3">
@@ -264,5 +274,16 @@ function CustomerCard({
         ))}
       </div>
     </article>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </dt>
+      <dd className="mt-1 break-words text-sm text-foreground">{value}</dd>
+    </div>
   );
 }
