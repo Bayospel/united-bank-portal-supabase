@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, FileCheck2, Landmark, Loader2, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
+import { CreditCard, FileCheck2, Landmark, Loader2, MessageSquare, RefreshCw, Send, ShieldCheck, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,12 +43,23 @@ export interface AdminCustomer {
   accounts: AdminCustomerAccount[];
 }
 
+export interface SupportMessage {
+  id: string;
+  user_id: string;
+  sender_type: "customer" | "admin";
+  message: string;
+  created_at: string;
+}
+
 function AdminPage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<{
     customer: AdminCustomer;
     account: AdminCustomerAccount;
   } | null>(null);
+  
+  const [activeChatCustomer, setActiveChatCustomer] = useState<AdminCustomer | null>(null);
+  const [replyText, setReplyText] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
 
@@ -56,12 +67,60 @@ function AdminPage() {
     queryKey: ["admin-customers-client"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("admin_list_customers");
-      if (error) {
-        console.error("RPC Error:", error);
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
       return (data ?? []) as AdminCustomer[];
     },
+  });
+
+  // Fetch chat messages for active chat customer
+  const { data: chatMessages = [], refetch: refetchChat } = useQuery({
+    queryKey: ["admin-chat", activeChatCustomer?.id],
+    enabled: !!activeChatCustomer,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_messages")
+        .select("*")
+        .eq("user_id", activeChatCustomer!.id)
+        .order("created_at", { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []) as SupportMessage[];
+    },
+  });
+
+  // Realtime listener for live chat updates
+  useEffect(() => {
+    if (!activeChatCustomer) return;
+    const channel = supabase
+      .channel(`support-${activeChatCustomer.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "support_messages", filter: `user_id=eq.${activeChatCustomer.id}` },
+        () => {
+          refetchChat();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeChatCustomer, refetchChat]);
+
+  const sendReply = useMutation({
+    mutationFn: async () => {
+      if (!activeChatCustomer || !replyText.trim()) return;
+      const { error } = await supabase.from("support_messages").insert({
+        user_id: activeChatCustomer.id,
+        sender_type: "admin",
+        message: replyText.trim(),
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      setReplyText("");
+      refetchChat();
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const credit = useMutation({
@@ -112,8 +171,7 @@ function AdminPage() {
               United Bank Admin Console
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-white/65">
-              Review newly created customer accounts, verification details, and balances. Every
-              balance credit requires a note and creates an audit record.
+              Review customer accounts, verification details, credit balances, and chat live with customers.
             </p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-gold/30 bg-white/5 px-3 py-2 text-xs font-semibold text-gold">
@@ -122,7 +180,7 @@ function AdminPage() {
         </div>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.6fr)]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.6fr)]">
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -148,14 +206,16 @@ function AdminPage() {
                 key={customer.id}
                 customer={customer}
                 onCredit={(account) => setSelected({ customer, account })}
+                onOpenChat={() => setActiveChatCustomer(customer)}
               />
             ))
           )}
         </section>
 
-        <aside className="h-fit rounded-2xl border bg-card p-5 shadow-sm lg:sticky lg:top-24">
-          {selected ? (
-            <>
+        <aside className="h-fit space-y-6 lg:sticky lg:top-24">
+          {/* Credit Account Panel */}
+          {selected && (
+            <div className="rounded-2xl border bg-card p-5 shadow-sm">
               <div className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-gold" />
                 <h2 className="font-display text-lg font-semibold text-navy">Add customer funds</h2>
@@ -180,7 +240,7 @@ function AdminPage() {
                   <Label htmlFor="creditNote">Reason / audit note</Label>
                   <Textarea
                     id="creditNote"
-                    rows={4}
+                    rows={3}
                     placeholder="Approved opening balance adjustment"
                     value={note}
                     onChange={(event) => setNote(event.target.value)}
@@ -199,18 +259,71 @@ function AdminPage() {
                   </Button>
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="py-6 text-center">
-              <Landmark className="mx-auto h-8 w-8 text-gold" />
-              <h2 className="mt-3 font-display text-lg font-semibold text-navy">
-                Select an account
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Choose a customer account to open the audited balance-credit form.
-              </p>
             </div>
           )}
+
+          {/* Live Support Chat Panel */}
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-gold" />
+                <h2 className="font-display text-lg font-semibold text-navy">Customer Support Chat</h2>
+              </div>
+              {activeChatCustomer && (
+                <Button variant="ghost" size="sm" onClick={() => setActiveChatCustomer(null)}>
+                  Close
+                </Button>
+              )}
+            </div>
+
+            {activeChatCustomer ? (
+              <div className="mt-4 space-y-4">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  Chatting with: <span className="text-navy">{activeChatCustomer.display_name ?? activeChatCustomer.email}</span>
+                </p>
+                <div className="h-64 space-y-3 overflow-y-auto rounded-xl border bg-surface p-3 text-xs">
+                  {chatMessages.length === 0 ? (
+                    <p className="py-20 text-center text-muted-foreground">No messages yet from this customer.</p>
+                  ) : (
+                    chatMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col ${msg.sender_type === "admin" ? "items-end" : "items-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] rounded-xl px-3 py-2 ${
+                            msg.sender_type === "admin" ? "bg-navy text-white" : "bg-muted text-foreground"
+                          }`}
+                        >
+                          <p>{msg.message}</p>
+                        </div>
+                        <span className="mt-1 text-[10px] text-muted-foreground">
+                          {formatDateTime(msg.created_at)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Type a reply..."
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && sendReply.mutate()}
+                  />
+                  <Button className="bg-gold text-navy hover:bg-gold/90" onClick={() => sendReply.mutate()} disabled={sendReply.isPending}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Click <span className="font-semibold text-navy">"Open Chat"</span> on any customer card to review and reply to their support messages.
+                </p>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
     </div>
@@ -220,9 +333,11 @@ function AdminPage() {
 function CustomerCard({
   customer,
   onCredit,
+  onOpenChat,
 }: {
   customer: AdminCustomer;
   onCredit: (account: AdminCustomerAccount) => void;
+  onOpenChat: () => void;
 }) {
   return (
     <article className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
@@ -235,9 +350,14 @@ function CustomerCard({
             {customer.email ?? "No email"} · Created {formatDateTime(customer.created_at)}
           </p>
         </div>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold-soft px-2.5 py-1 text-xs font-semibold text-navy">
-          <FileCheck2 className="h-3.5 w-3.5" /> {(customer.government_id_status ?? "pending").replace("_", " ")}
-        </span>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs font-semibold" onClick={onOpenChat}>
+            <MessageSquare className="h-3.5 w-3.5 text-gold" /> Open Chat
+          </Button>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/40 bg-gold-soft px-2.5 py-1 text-xs font-semibold text-navy">
+            <FileCheck2 className="h-3.5 w-3.5" /> {(customer.government_id_status ?? "pending").replace("_", " ")}
+          </span>
+        </div>
       </div>
 
       <dl className="mt-4 grid gap-3 border-t pt-4 text-sm sm:grid-cols-2">
