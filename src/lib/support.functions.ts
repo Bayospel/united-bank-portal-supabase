@@ -71,12 +71,20 @@ export const sendSupportMessageFn = createServerFn({ method: "POST" })
       throw new Error("Too many messages. Please wait a few minutes and try again.");
     }
 
-    const to = process.env["SUPPORT_EMAIL"];
-    if (!to) throw new Error("Customer services is temporarily unavailable.");
+    // Always fallback to your verified domain's customer service inbox if env variable is missing or blank
+    const rawTo = process.env["SUPPORT_EMAIL"]?.trim();
+    const to = rawTo || "customerservices@unitedbankingoffshore.com";
 
     const { sendEmail, supportMessageEmail } = await import("@/lib/email.server");
     const reference = `UBO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const mail = supportMessageEmail({ reference, ...data });
-    await sendEmail({ to, replyTo: data.email, ...mail });
+
+    // Send using a clean array address to satisfy Resend validation requirements
+    await sendEmail({
+      to: [to],
+      replyTo: data.email.trim(),
+      ...mail,
+    });
+
     return { ok: true as const, reference };
   });
