@@ -152,7 +152,7 @@ export const getAdminCustomersFn = createServerFn({ method: "GET" })
 
 export const adminCreditAccountFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { accountId: string; amount: number; note: string }) => input)
+  .validator((input: { accountId: string; amount: number; note: string }) => input)
   .handler(async ({ context, data }) => {
     const { supabase } = context;
     const { data: txId, error } = await supabase.rpc("admin_credit_account", {
@@ -225,6 +225,81 @@ export const adminCreditAccountFn = createServerFn({ method: "POST" })
     return { id: txId as string };
   });
 
+export const adminDebitAccountFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: { accountId: string; amount: number; note: string }) => input)
+  .handler(async ({ context, data }) => {
+    const { supabase } = context;
+    const { data: txId, error } = await supabase.rpc("admin_debit_account", {
+      _account_id: data.accountId,
+      _amount: data.amount,
+      _note: data.note,
+    });
+    if (error) throw new Error(error.message);
+
+    // Fetch account and customer profile to send professional debit bank alert email
+    const { data: accountData } = await supabase
+      .from("accounts")
+      .select("user_id, currency, account_number")
+      .eq("id", data.accountId)
+      .single();
+
+    if (accountData) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email, display_name")
+        .eq("id", accountData.user_id)
+        .single();
+
+      if (profile?.email) {
+        try {
+          await resend.emails.send({
+            from: "United Bank Offshore <support@unitedbankingoffshore.com>",
+            to: [profile.email],
+            subject: `DR ALERT: Debit Advice of ${accountData.currency} ${data.amount.toLocaleString()}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; background-color: #f4f6f8; padding: 20px;">
+                <div style="max-width: 600px; margin: 0 auto; background: #0A192F; border-radius: 12px; overflow: hidden; color: #ffffff;">
+                  <div style="padding: 24px; text-align: center; border-bottom: 1px solid rgba(212, 175, 55, 0.2);">
+                    <h2 style="color: #D4AF37; margin: 0; letter-spacing: 1px;">UNITED BANK OFFSHORE</h2>
+                    <p style="font-size: 11px; color: #94a3b8; margin: 4px 0 0;">OFFICIAL TRANSACTION ADVICE</p>
+                  </div>
+                  <div style="padding: 32px; color: #e2e8f0; font-size: 14px; line-height: 1.6;">
+                    <p>Dear <strong>${profile.display_name ?? "Valued Client"}</strong>,</p>
+                    <p>We wish to inform you that a debit transaction has occurred on your account.</p>
+                    
+                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 8px; padding: 16px; margin: 20px 0;">
+                      <p style="margin: 6px 0;"><strong>Transaction Type:</strong> Account Debited / Adjustment</p>
+                      <p style="margin: 6px 0;"><strong>Account Number:</strong> ${accountData.account_number ?? "N/A"}</p>
+                      <p style="margin: 6px 0;"><strong>Amount Debited:</strong> <span style="color: #ef4444; font-size: 16px; font-weight: bold;">${accountData.currency} ${data.amount.toLocaleString()}</span></p>
+                      <p style="margin: 6px 0;"><strong>Narration:</strong> ${data.note}</p>
+                      <p style="margin: 6px 0;"><strong>Status:</strong> Processed</p>
+                    </div>
+
+                    <p>If you have any questions regarding this debit, please contact Customer Services through your banking console.</p>
+                    
+                    <p style="margin-top: 32px;">
+                      Sincerely,<br>
+                      <strong style="color: #D4AF37;">Office of the President & Compliance</strong><br>
+                      United Bank Offshore
+                    </p>
+                  </div>
+                  <div style="padding: 16px 24px; background: #071120; font-size: 11px; color: #94a3b8; text-align: center;">
+                    &copy; 2026 United Bank Offshore. Secure Global Banking Infrastructure.
+                  </div>
+                </div>
+              </div>
+            `,
+          });
+        } catch (mailErr) {
+          console.error("Failed to send admin debit alert email:", mailErr);
+        }
+      }
+    }
+
+    return { id: txId as string };
+  });
+
 export const getDashboardData = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -287,7 +362,7 @@ export const getDashboardData = createServerFn({ method: "GET" })
 
 export const getTransactions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
+  .validator(
     (input: {
       currency?: string | undefined;
       type?: string | undefined;
@@ -312,7 +387,7 @@ export const getTransactions = createServerFn({ method: "GET" })
 
 export const executeTransferFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
+  .validator(
     (input: {
       sourceAccountId: string;
       type: string;
@@ -406,7 +481,7 @@ export interface ProfileUpdate {
 
 export const updateProfileFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: ProfileUpdate) => input)
+  .validator((input: ProfileUpdate) => input)
   .handler(async ({ context, data }) => {
     const patch = Object.fromEntries(Object.entries(data ?? {}).filter(([, v]) => v !== undefined));
     const { error } = await context.supabase
@@ -419,7 +494,7 @@ export const updateProfileFn = createServerFn({ method: "POST" })
 
 export const removeDeviceFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string }) => input)
+  .validator((input: { id: string }) => input)
   .handler(async ({ context, data }) => {
     const { error } = await context.supabase
       .from("trusted_devices")
