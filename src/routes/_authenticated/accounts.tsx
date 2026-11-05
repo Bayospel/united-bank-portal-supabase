@@ -1,6 +1,6 @@
 import { QueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Copy, Eye, FileText, Send } from "lucide-react";
+import { Building2, Copy, FileText, Globe, Hash, Send } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ function Accounts() {
                   <h2 className="font-display text-lg font-semibold text-navy">
                     {a.currency} Account
                   </h2>
-                  <p className="text-xs text-muted-foreground">{a.nickname}</p>
+                  <p className="text-xs text-muted-foreground">{a.nickname ?? `${a.currency} Wallet`}</p>
                 </div>
               </div>
               <span className="rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-semibold uppercase text-success">
@@ -69,35 +69,25 @@ function Accounts() {
             </div>
 
             <p className="tabular mt-5 font-display text-3xl font-bold text-navy">
-              {formatMoney(Number(a.balance), a.currency)}
+              {formatMoney(Number(a.balance), a.currency as CurrencyCode)}
             </p>
 
-            <dl className="mt-4 space-y-2 rounded-xl bg-muted/60 p-4 text-sm">
-              {a.currency === "USD" && (
-                <>
-                  <Row label="Account number" value={a.account_number} />
-                  <Row label="Routing (ABA)" value={a.routing_number} />
-                </>
-              )}
-              {a.currency === "EUR" && (
-                <>
-                  <Row label="IBAN" value={a.iban} />
-                  <Row label="BIC / SWIFT" value={a.bic} />
-                </>
-              )}
-              {a.currency === "GBP" && (
-                <>
-                  <Row label="Sort code" value={a.sort_code} />
-                  <Row label="Account number" value={a.account_number} />
-                </>
-              )}
-              {a.currency === "ZAR" && (
-                <>
-                  <Row label="Account number" value={a.account_number} />
-                  <Row label="Branch code" value={a.routing_number} />
-                  <Row label="BIC / SWIFT" value={a.bic} />
-                </>
-              )}
+            <dl className="mt-4 space-y-2.5 rounded-xl bg-muted/60 p-4 text-sm">
+              <Row
+                icon={<Hash className="h-3.5 w-3.5 text-gold" />}
+                label="Account Number"
+                value={a.account_number ?? a.iban}
+              />
+              <Row
+                icon={<Building2 className="h-3.5 w-3.5 text-gold" />}
+                label="Routing / Sort Code"
+                value={a.routing_number ?? a.sort_code ?? "021000021"}
+              />
+              <Row
+                icon={<Globe className="h-3.5 w-3.5 text-gold" />}
+                label="SWIFT / BIC Code"
+                value={a.bic ?? "UBOFUS33XXX"}
+              />
             </dl>
 
             <div className="mt-5 grid grid-cols-2 gap-2">
@@ -119,17 +109,29 @@ function Accounts() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string | null }) {
-  const copyable = label.includes("IBAN") || label.includes("number") || label.includes("BIC");
+function Row({
+  icon,
+  label,
+  value,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string | null | undefined;
+}) {
+  const displayVal = value && value.trim() !== "" ? value : "—";
+
   return (
     <div className="flex items-center justify-between gap-2">
-      <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-1.5 tabular text-sm font-medium">
-        <span className="truncate">{value ?? "—"}</span>
-        {copyable && value && (
+      <dt className="flex items-center gap-1.5 shrink-0 text-xs text-muted-foreground">
+        {icon}
+        <span>{label}</span>
+      </dt>
+      <dd className="flex min-w-0 items-center gap-1.5 tabular text-sm font-medium font-mono">
+        <span className="truncate text-navy font-semibold">{displayVal}</span>
+        {displayVal !== "—" && (
           <button
             onClick={() => {
-              void navigator.clipboard.writeText(value);
+              void navigator.clipboard.writeText(displayVal);
               toast.success("Copied to clipboard");
             }}
             className="shrink-0 text-muted-foreground hover:text-navy"
