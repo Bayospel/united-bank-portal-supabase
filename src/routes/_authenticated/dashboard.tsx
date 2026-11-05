@@ -10,6 +10,8 @@ import {
   TrendingDown,
   TrendingUp,
   Smartphone,
+  Activity,
+  Sparkles,
 } from "lucide-react";
 
 import { DebitCard } from "@/components/banking/debit-card";
@@ -75,29 +77,30 @@ function Dashboard() {
   const lastEvent = events[0];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      {/* Welcome header */}
-      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between">
+    <div className="mx-auto max-w-7xl space-y-6 animate-in fade-in duration-500">
+      {/* Welcome header with subtle slide-down */}
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 sm:flex sm:flex-wrap sm:justify-between animate-in slide-in-from-top-4 duration-500">
         <div className="min-w-0">
           <h1 className="truncate font-display text-2xl font-bold text-navy sm:text-3xl">
             {greeting(profile.display_name ?? "Client")}
           </h1>
-          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm flex items-center gap-2">
             Last login: {formatDateTime(profile.last_login_at)} ·{" "}
-            <span className="font-medium text-navy">
+            <span className="inline-flex items-center gap-1 font-medium text-navy">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               {profile.two_factor_enabled ? "2FA active session" : "2FA inactive"}
             </span>
           </p>
         </div>
         <span
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-transform hover:scale-105 ${
             twoFactorOn
               ? "border-gold/40 bg-gold-soft text-navy"
               : "border-destructive/30 bg-destructive/10 text-destructive"
           }`}
         >
           {twoFactorOn ? (
-            <ShieldCheck className="h-3.5 w-3.5" />
+            <ShieldCheck className="h-3.5 w-3.5 text-gold animate-bounce" />
           ) : (
             <ShieldAlert className="h-3.5 w-3.5" />
           )}
@@ -105,14 +108,20 @@ function Dashboard() {
         </span>
       </header>
 
-      {/* Net worth */}
-      <section className="overflow-hidden rounded-2xl bg-navy p-6 text-white sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold">
-          Consolidated net worth
-        </p>
+      {/* Net worth card with premium gradient pulse */}
+      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-navy via-slate-900 to-navy p-6 text-white shadow-xl sm:p-8 transition-all hover:shadow-2xl">
+        <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-gold/10 blur-3xl pointer-events-none animate-pulse" />
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold flex items-center gap-1.5">
+            <Sparkles className="h-3.5 w-3.5" /> Consolidated net worth
+          </p>
+          <span className="flex items-center gap-1 text-[10px] text-gold/80 bg-gold/10 px-2.5 py-1 rounded-full border border-gold/20">
+            <Activity className="h-3 w-3 animate-pulse" /> Live valuation
+          </span>
+        </div>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="tabular font-display text-4xl font-bold sm:text-5xl">
+            <p className="tabular font-display text-4xl font-bold sm:text-5xl tracking-tight">
               {formatMoney(totalUsd, "USD")}
             </p>
             <p className="mt-1 text-xs text-white/60">Estimated value · USD equivalent</p>
@@ -123,7 +132,7 @@ function Dashboard() {
               const value = Number(a.balance) * rate;
               const pct = totalUsd > 0 ? Math.round((value / totalUsd) * 100) : 0;
               return (
-                <div key={a.id} className="min-w-[110px] rounded-xl bg-white/5 px-3 py-2">
+                <div key={a.id} className="min-w-[110px] rounded-xl bg-white/5 border border-white/10 px-3 py-2 transition-transform hover:-translate-y-0.5">
                   <p className="text-xs text-white/60">
                     {a.currency} · {pct}%
                   </p>
@@ -138,8 +147,10 @@ function Dashboard() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <DebitCard holderName={profile.display_name ?? "Account holder"} account={accounts[0]} />
-        <section className="flex flex-col justify-center rounded-2xl border bg-card p-5 sm:p-6">
+        <div className="transition-transform duration-300 hover:scale-[1.01]">
+          <DebitCard holderName={profile.display_name ?? "Account holder"} account={accounts[0]} />
+        </div>
+        <section className="flex flex-col justify-center rounded-2xl border bg-card p-5 sm:p-6 shadow-sm transition-all hover:shadow-md">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
             Account verification
           </p>
@@ -150,7 +161,7 @@ function Dashboard() {
             Residential address, employment details, date of birth, and government ID help us keep
             your account secure.
           </p>
-          <Link to="/security" className="mt-4 text-sm font-semibold text-gold hover:underline">
+          <Link to="/security" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-gold hover:underline transition-transform hover:translate-x-1">
             Review security & profile →
           </Link>
         </section>
@@ -166,12 +177,12 @@ function Dashboard() {
           </div>
 
           {/* Recent transactions */}
-          <section className="rounded-2xl border bg-card p-5">
+          <section className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold text-navy">Recent activity</h2>
               <Link
                 to="/transactions"
-                className="flex items-center gap-1 text-xs font-semibold text-gold hover:underline"
+                className="flex items-center gap-1 text-xs font-semibold text-gold hover:underline transition-transform hover:translate-x-0.5"
               >
                 View all <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
@@ -183,9 +194,9 @@ function Dashboard() {
                 </li>
               ) : (
                 transactions.map((t) => (
-                  <li key={t.id} className="flex items-center justify-between gap-3 py-3">
+                  <li key={t.id} className="flex items-center justify-between gap-3 py-3 transition-colors hover:bg-muted/50 px-2 rounded-xl">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
+                      <p className="truncate text-sm font-medium text-navy">
                         {t.counterparty_name ?? t.type}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
@@ -207,7 +218,7 @@ function Dashboard() {
 
         {/* Sidebar modules */}
         <div className="space-y-4">
-          <section className="rounded-2xl border bg-card p-5">
+          <section className="rounded-2xl border bg-card p-5 shadow-sm">
             <h2 className="font-display text-lg font-semibold text-navy">Global market watch</h2>
             <ul className="mt-3 space-y-4">
               {rates.map((r) => {
@@ -222,10 +233,10 @@ function Dashboard() {
                   .join(" ");
                 const up = Number(r.change_24h) >= 0;
                 return (
-                  <li key={r.id} className="flex items-center justify-between gap-3">
+                  <li key={r.id} className="flex items-center justify-between gap-3 transition-transform hover:scale-[1.02]">
                     <div>
-                      <p className="text-sm font-semibold">{r.pair}</p>
-                      <p className={`text-xs ${up ? "text-success" : "text-destructive"}`}>
+                      <p className="text-sm font-semibold text-navy">{r.pair}</p>
+                      <p className={`text-xs font-medium ${up ? "text-success" : "text-destructive"}`}>
                         {up ? "▲" : "▼"} {Math.abs(Number(r.change_24h)) * 100}%
                       </p>
                     </div>
@@ -234,18 +245,18 @@ function Dashboard() {
                         points={pts}
                         fill="none"
                         stroke="currentColor"
-                        className={up ? "text-success" : "text-destructive"}
+                        className={`${up ? "text-success" : "text-destructive"} transition-all duration-700`}
                         strokeWidth="2"
                       />
                     </svg>
-                    <p className="tabular text-sm font-medium">{Number(r.rate).toFixed(4)}</p>
+                    <p className="tabular text-sm font-semibold text-navy">{Number(r.rate).toFixed(4)}</p>
                   </li>
                 );
               })}
             </ul>
           </section>
 
-          <section className="rounded-2xl border bg-card p-5">
+          <section className="rounded-2xl border bg-card p-5 shadow-sm">
             <h2 className="font-display text-lg font-semibold text-navy">Security & audit</h2>
             <div className="mt-3 space-y-3 text-sm">
               <div className="flex items-center gap-2">
@@ -254,11 +265,11 @@ function Dashboard() {
                 ) : (
                   <ShieldAlert className="h-4 w-4 shrink-0 text-destructive" />
                 )}
-                <span>Two-factor authentication {twoFactorOn ? "active" : "disabled"}</span>
+                <span className="text-foreground">Two-factor authentication {twoFactorOn ? "active" : "disabled"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Smartphone className="h-4 w-4 shrink-0 text-gold" />
-                <span>
+                <span className="text-foreground">
                   {devices.length} recognized device{devices.length === 1 ? "" : "s"}
                 </span>
               </div>
@@ -269,7 +280,7 @@ function Dashboard() {
               )}
               <Link
                 to="/security"
-                className="inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-gold hover:underline transition-transform hover:translate-x-1 pt-1"
               >
                 Manage security <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
@@ -284,10 +295,10 @@ function Dashboard() {
 function WalletCard({ account, rateMap }: { account: Account; rateMap: Record<string, number> }) {
   const usd = Number(account.balance) * (crossRate(account.currency, "USD", rateMap) ?? 1);
   return (
-    <div className="flex flex-col rounded-2xl border bg-card p-5 shadow-sm">
+    <div className="flex flex-col rounded-2xl border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-gold/40">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
-          <span className="text-2xl">
+          <span className="text-2xl transition-transform hover:scale-110">
             {account.currency === "USD"
               ? "🇺🇸"
               : account.currency === "EUR"
@@ -318,16 +329,16 @@ function WalletCard({ account, rateMap }: { account: Account; rateMap: Record<st
         <Link
           to="/transactions"
           search={{ account: account.currency, type: undefined }}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold text-navy transition-colors hover:bg-accent"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold text-navy transition-colors hover:bg-accent hover:border-navy/30"
         >
           <FileText className="h-3.5 w-3.5" /> View Statement
         </Link>
         <Link
           to="/transfers"
           search={{ from: account.currency, type: ACTION_TYPES[account.currency] }}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-navy/90"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-navy/90 hover:scale-[1.02]"
         >
-          <Send className="h-3.5 w-3.5" /> {ACTION_LABELS[account.currency]}
+          <Send className="h-3.5 w-3.5 text-gold" /> {ACTION_LABELS[account.currency]}
         </Link>
       </div>
     </div>
