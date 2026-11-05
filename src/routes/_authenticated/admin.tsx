@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, FileCheck2, Landmark, Loader2, MessageSquare, MinusCircle, PlusCircle, RefreshCw, Send, ShieldCheck, UserRound } from "lucide-react";
+import { Building2, CreditCard, FileCheck2, Globe, Hash, Landmark, Loader2, MessageSquare, MinusCircle, PlusCircle, RefreshCw, Send, ShieldCheck, UserRound } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ export interface AdminCustomerAccount {
   currency: string;
   balance: number;
   account_number: string | null;
+  routing_number?: string | null;
+  bic?: string | null;
   iban: string | null;
   status: string;
 }
@@ -385,20 +387,34 @@ function CustomerCard({
         />
       </dl>
 
-      <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {(customer.accounts ?? []).map((account) => (
-          <div key={account.id} className="rounded-xl border bg-surface p-3">
+          <div key={account.id} className="rounded-xl border bg-surface p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-navy">{account.currency}</p>
+              <p className="text-xs font-semibold text-navy">{account.currency} Account</p>
               <span className="text-[10px] text-muted-foreground">{account.status}</span>
             </div>
-            <p className="mt-1 tabular text-lg font-bold text-navy">
+            
+            <p className="tabular text-lg font-bold text-navy">
               {formatMoney(Number(account.balance), account.currency as any)}
             </p>
-            <p className="mt-1 truncate text-[10px] text-muted-foreground">
-              {account.account_number ?? account.iban ?? "No account identifier"}
-            </p>
-            <div className="mt-3 flex gap-1.5">
+
+            <div className="border-t pt-2 space-y-1 text-[11px] font-mono text-muted-foreground">
+              <p className="flex justify-between items-center">
+                <span className="text-navy font-semibold">Acc No:</span>
+                <span className="truncate">{account.account_number ?? account.iban ?? "N/A"}</span>
+              </p>
+              <p className="flex justify-between items-center">
+                <span className="text-navy font-semibold">Routing:</span>
+                <span>{account.routing_number ?? "021000021"}</span>
+              </p>
+              <p className="flex justify-between items-center">
+                <span className="text-navy font-semibold">SWIFT:</span>
+                <span>{account.bic ?? "UBOFUS33XXX"}</span>
+              </p>
+            </div>
+
+            <div className="pt-2 flex gap-1.5">
               <Button
                 size="sm"
                 className="flex-1 bg-navy text-white hover:bg-navy/90 text-xs px-2"
